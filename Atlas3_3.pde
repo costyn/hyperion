@@ -17,10 +17,15 @@ as Arduino examples
 #include <OneWire.h>
 #include <stdio.h>
 #include <util/crc16.h>
-// #include <PID_Beta6.h>
+#include <Wire.h>
+
+#define ONE_WIRE_BUS 10
+#define NTX2_SPACE_PIN 11
+#define NTX2_MARK_PIN 12
+#define NTX2_POWER_PIN 6
 
 TinyGPS gps;
-OneWire ds(10); // DS18x20 Temperature chip i/o One-wire
+OneWire ds(ONE_WIRE_BUS); // DS18x20 Temperature chip i/o One-wire
 
 //Tempsensor variables
 byte address0[8] = {0x10, 0x68, 0x10, 0x36, 0x02, 0x08, 0x00, 0x9D};
@@ -28,14 +33,6 @@ byte address1[8] = {0x10, 0xA3, 0x32, 0x36, 0x02, 0x08, 0x00, 0x81};
 
 byte address2[8] = {0x28, 0xE8, 0x89, 0xC2, 0x2, 0x0, 0x0, 0xDF}; // placeholder
 int temp0 = 0, temp1 = 0, temp2 = 0;
-int photo = 0;
-
-/*
-//PID Controller
-double Setpoint, Input, Output;
-PID myPID(&Input, &Output, &Setpoint,10,5,0);
-int iOutput = 0;
-*/
 
 int count = 1, nightloop = 0;
 byte navmode = 99;
@@ -47,7 +44,34 @@ char latbuf[12] = "0", lonbuf[12] = "0", altbuf[12] = "0";
 long int ialt = 123;
 int numbersats = 99;
 
-int battV;
+// ============ Barometer ================= 
+
+// Barometer
+// Calibration values
+#define BMP085_ADDRESS 0x77  // I2C address of BMP085
+const unsigned char OSS = 0;  // Oversampling Setting
+
+int ac1;
+int ac2; 
+int ac3; 
+unsigned int ac4;
+unsigned int ac5;
+unsigned int ac6;
+int b1; 
+int b2;
+int mb;
+int mc;
+int md;
+
+// b5 is calculated in bmp085GetTemperature(...), this variable is also used in bmp085GetPressure(...)
+// so ...Temperature(...) must be called before ...Pressure(...).
+long b5; 
+
+short b_temperature;
+long b_pressure;
+
+
+
 
 // ------------------------
 // RTTY Functions - from RJHARRISON's AVR Code
@@ -95,15 +119,15 @@ void rtty_txbit (int bit)
 		if (bit)
 		{
 		  // high
-                    digitalWrite(4, HIGH);  
-                    digitalWrite(5, LOW);
+                    digitalWrite(NTX2_SPACE_PIN, HIGH);  
+                    digitalWrite(NTX2_MARK_PIN, LOW);
                     digitalWrite(13,HIGH); // LED on
 		}
 		else
 		{
 		  // low
-                    digitalWrite(4, LOW);
-                    digitalWrite(5, HIGH);
+                    digitalWrite(NTX2_SPACE_PIN, LOW);
+                    digitalWrite(NTX2_MARK_PIN, HIGH);
                     digitalWrite(13, LOW); // LED off
 		}
 		//delayMicroseconds(20500); // 10000 = 100 BAUD 20150
@@ -297,48 +321,24 @@ int getTempdata(byte sensorAddress[8]) {
   }
   return Whole;
 }
-/*
-void lightsensor() {
-  int photocellPin = 0; // the cell and 10K pulldown are connected to a0
-  //Photocell/ Photodiode External Light Reading
-  photo = analogRead(photocellPin);
-  photo = photo / 10;
-}
-*/
-/*
-void radiotemp() {
-        //Measure temperature sensor and adjust heater.
-//        if(battV > 350){
-          temp0 = getTempdata(address0);
-          if((temp0 < 50) && (temp0 > -50))
-          {
-            Input = double(temp0);
-            myPID.Compute();
-            analogWrite(10,Output);
-          }
-   //     }
- //       else{
- //         iOutput = -1;
- //       }
-}
-*/
 
 void setup()
 {
-  pinMode(11, OUTPUT); //Radio Tx0
-  pinMode(12, OUTPUT); //Radio Tx1
-  pinMode(6, OUTPUT); //Radio En
-  digitalWrite(6, HIGH);
+  pinMode(NTX2_SPACE_PIN, OUTPUT); //Radio Tx0
+  pinMode(NTX2_MARK_PIN, OUTPUT); //Radio Tx1
+  pinMode(NTX2_POWER_PIN, OUTPUT); //Radio En
+  digitalWrite(NTX2_POWER_PIN, HIGH);
   Serial.begin(9600);
   
   delay(5000); // We have to wait for a bit for the GPS to boot otherwise the commands get missed
   
   setupGPS();
   
-//  Setpoint = 2;
-//  myPID.SetMode(AUTO);
-  
-//  analogReference(DEFAULT);
+    // Initialize Barometer 
+//  Serial.println( "Setting up barometer..." );
+  Wire.begin();
+  bmp085Calibration();
+//  Serial.println( "done!" );
 
 }
 
@@ -348,7 +348,7 @@ void loop() {
     int n;
     
     if((count % 10) == 0) {
-     digitalWrite(6, LOW);
+     digitalWrite(NTX2_POWER_PIN, LOW);
      checkNAV();
      delay(1000);
      if(navmode != 6){
@@ -357,7 +357,7 @@ void loop() {
      }
      checkNAV();
      delay(1000);
-     digitalWrite(6, HIGH);
+     digitalWrite(NTX2_POWER_PIN, HIGH);
    }
    
     Serial.println("$PUBX,00*33"); //Poll GPS
@@ -394,20 +394,24 @@ void loop() {
     }
     }
     
-    battV = 0 ;
+//    battV = 0 ;
     temp0 = getTempdata(address0);
     temp1 = getTempdata(address1);
+
+    b_temperature = bmp085GetTemperature(bmp085ReadUT());
+    b_pressure = bmp085GetPressure(bmp085ReadUP());
+
 //    temp2 = getTempdata(address2);
 //    lightsensor();
 //    iOutput = int(Output);
     numbersats = gps.sats();
     
 //    radiotemp();
-    n=sprintf (superbuffer, "$$ATLAS,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, battV, temp0, temp1 );
+    n=sprintf (superbuffer, "$$ATLAS,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, b_pressure, temp0, temp1, b_temperature );
     if (n > -1){
       n = sprintf (superbuffer, "%s*%04X\n", superbuffer, gps_CRC16_checksum(superbuffer));
       rtty_txstring(superbuffer);
-      Serial.println(superbuffer); 
+//      Serial.println(superbuffer); 
     }
     count++;
 
