@@ -19,9 +19,11 @@ as Arduino examples
 #include <util/crc16.h>
 #include <Wire.h>
 
+#include "SD.h"
+
 #define ONE_WIRE_BUS 10
-#define NTX2_SPACE_PIN 11
-#define NTX2_MARK_PIN 12
+#define NTX2_SPACE_PIN 4
+#define NTX2_MARK_PIN 5
 #define NTX2_POWER_PIN 6
 
 TinyGPS gps;
@@ -68,8 +70,9 @@ int md;
 long b5; 
 
 short b_temperature;
+char b_temp_s[3];
 long b_pressure;
-
+char b_press_s[7];
 
 
 
@@ -399,7 +402,10 @@ void loop() {
     temp1 = getTempdata(address1);
 
     b_temperature = bmp085GetTemperature(bmp085ReadUT());
+    b_temperature /= 10 ;
     b_pressure = bmp085GetPressure(bmp085ReadUP());
+    dtostrf(b_pressure,1,0,b_press_s);
+//    dtostrf(b_temperature,1,0,b_temp_s);
 
 //    temp2 = getTempdata(address2);
 //    lightsensor();
@@ -407,11 +413,11 @@ void loop() {
     numbersats = gps.sats();
     
 //    radiotemp();
-    n=sprintf (superbuffer, "$$ATLAS,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, b_pressure, temp0, temp1, b_temperature );
+    n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%s,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, b_press_s, temp0, temp1, b_temperature );
     if (n > -1){
       n = sprintf (superbuffer, "%s*%04X\n", superbuffer, gps_CRC16_checksum(superbuffer));
       rtty_txstring(superbuffer);
-//      Serial.println(superbuffer); 
+      Serial.println(superbuffer); 
     }
     count++;
 
