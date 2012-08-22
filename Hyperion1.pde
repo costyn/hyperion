@@ -1,17 +1,16 @@
 /*
-Arduino code used on Atlas flight computer for the Atlas3 flight 11/11/11
+Arduino code used on Hyperion flight computer 
 Payload consisted of:
- * Atlas PCB
- * ATmega328
+ * Seeedstudio stalker v328
  * Radiometrix NTX2 10mW 434.075Mhz
  * GPSbee (Ublox 5) GPS
- * 3x DS18b20 temp sensors
- * Photodiode
-Flight reached 37033m altitude before descending by parachute and landing
-in the North Sea.
+ * 2x DS18b20 temp sensors
+ * BMP085 barometer
 
 Code by James Coxon (jacoxon@googlemail.com) based on previous code as well
 as Arduino examples
+
+Minor modifications by Costyn van Dongen
 */
 #include <TinyGPS.h>
 #include <OneWire.h>
@@ -351,16 +350,10 @@ void loop() {
     int n;
     
     if((count % 10) == 0) {
-     digitalWrite(NTX2_POWER_PIN, LOW);
-     checkNAV();
-     delay(1000);
      if(navmode != 6){
        setupGPS();
        delay(1000);
      }
-     checkNAV();
-     delay(1000);
-     digitalWrite(NTX2_POWER_PIN, HIGH);
    }
    
     Serial.println("$PUBX,00*33"); //Poll GPS
@@ -397,7 +390,6 @@ void loop() {
     }
     }
     
-//    battV = 0 ;
     temp0 = getTempdata(address0);
     temp1 = getTempdata(address1);
 
@@ -405,14 +397,8 @@ void loop() {
     b_temperature /= 10 ;
     b_pressure = bmp085GetPressure(bmp085ReadUP());
     dtostrf(b_pressure,1,0,b_press_s);
-//    dtostrf(b_temperature,1,0,b_temp_s);
-
-//    temp2 = getTempdata(address2);
-//    lightsensor();
-//    iOutput = int(Output);
     numbersats = gps.sats();
     
-//    radiotemp();
     n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%s,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, b_press_s, temp0, temp1, b_temperature );
     if (n > -1){
       n = sprintf (superbuffer, "%s*%04X\n", superbuffer, gps_CRC16_checksum(superbuffer));
