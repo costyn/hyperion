@@ -5,7 +5,6 @@ Payload consisted of:
  * Radiometrix NTX2 10mW 434.075Mhz
  * GPSbee (Ublox 5) GPS
  * 2x DS18b20 temp sensors
- * BMP085 barometer
 
 Code by James Coxon (jacoxon@googlemail.com) based on previous code as well
 as Arduino examples
@@ -16,9 +15,6 @@ Minor modifications by Costyn van Dongen
 #include <OneWire.h>
 #include <stdio.h>
 #include <util/crc16.h>
-#include <Wire.h>
-
-#include "SD.h"
 
 #define ONE_WIRE_BUS 10
 #define NTX2_SPACE_PIN 4
@@ -44,36 +40,6 @@ int hour = 0 , minute = 0 , second = 0, oldsecond = 0;
 char latbuf[12] = "0", lonbuf[12] = "0", altbuf[12] = "0";
 long int ialt = 123;
 int numbersats = 99;
-
-// ============ Barometer ================= 
-
-// Barometer
-// Calibration values
-#define BMP085_ADDRESS 0x77  // I2C address of BMP085
-const unsigned char OSS = 0;  // Oversampling Setting
-
-int ac1;
-int ac2; 
-int ac3; 
-unsigned int ac4;
-unsigned int ac5;
-unsigned int ac6;
-int b1; 
-int b2;
-int mb;
-int mc;
-int md;
-
-// b5 is calculated in bmp085GetTemperature(...), this variable is also used in bmp085GetPressure(...)
-// so ...Temperature(...) must be called before ...Pressure(...).
-long b5; 
-
-short b_temperature;
-char b_temp_s[3];
-long b_pressure;
-char b_press_s[7];
-
-
 
 // ------------------------
 // RTTY Functions - from RJHARRISON's AVR Code
@@ -335,13 +301,6 @@ void setup()
   delay(5000); // We have to wait for a bit for the GPS to boot otherwise the commands get missed
   
   setupGPS();
-  
-    // Initialize Barometer 
-//  Serial.println( "Setting up barometer..." );
-  Wire.begin();
-  bmp085Calibration();
-//  Serial.println( "done!" );
-
 }
 
 void loop() { 
@@ -350,11 +309,14 @@ void loop() {
     int n;
     
     if((count % 10) == 0) {
-     if(navmode != 6){
+      checkNav() ;
+      if(navmode != 6){
        setupGPS();
        delay(1000);
      }
-   }
+      Serial.println("$PUBX,00*33"); //Poll GPS to clear garbage
+     Serial.println("$PUBX,00*33"); //Poll GPS to clear garbage
+    }
    
     Serial.println("$PUBX,00*33"); //Poll GPS
     
@@ -393,13 +355,9 @@ void loop() {
     temp0 = getTempdata(address0);
     temp1 = getTempdata(address1);
 
-    b_temperature = bmp085GetTemperature(bmp085ReadUT());
-    b_temperature /= 10 ;
-    b_pressure = bmp085GetPressure(bmp085ReadUP());
-    dtostrf(b_pressure,1,0,b_press_s);
     numbersats = gps.sats();
     
-    n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%s,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, b_press_s, temp0, temp1, b_temperature );
+    n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, temp0, temp1 );
     if (n > -1){
       n = sprintf (superbuffer, "%s*%04X\n", superbuffer, gps_CRC16_checksum(superbuffer));
       rtty_txstring(superbuffer);
