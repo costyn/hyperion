@@ -309,7 +309,7 @@ void loop() {
     int n;
     
     if((count % 10) == 0) {
-      checkNav() ;
+      checkNAV() ;
       if(navmode != 6){
        setupGPS();
        delay(1000);
