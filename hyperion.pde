@@ -17,9 +17,7 @@ Minor modifications by Costyn van Dongen
 #include <util/crc16.h>
 
 #define ONE_WIRE_BUS 10
-#define NTX2_SPACE_PIN 4
-#define NTX2_MARK_PIN 5
-#define NTX2_POWER_PIN 6
+#define NTX2_RADIO_PIN 13
 
 TinyGPS gps;
 OneWire ds(ONE_WIRE_BUS); // DS18x20 Temperature chip i/o One-wire
@@ -87,16 +85,12 @@ void rtty_txbit (int bit)
 		if (bit)
 		{
 		  // high
-                    digitalWrite(NTX2_SPACE_PIN, HIGH);  
-                    digitalWrite(NTX2_MARK_PIN, LOW);
-                    digitalWrite(13,HIGH); // LED on
+                    digitalWrite(NTX2_RADIO_PIN, HIGH);  
 		}
 		else
 		{
 		  // low
-                    digitalWrite(NTX2_SPACE_PIN, LOW);
-                    digitalWrite(NTX2_MARK_PIN, HIGH);
-                    digitalWrite(13, LOW); // LED off
+                    digitalWrite(NTX2_RADIO_PIN, LOW);
 		}
 		//delayMicroseconds(20500); // 10000 = 100 BAUD 20150
                 //delayMicroseconds(20000); // 10000 = 100 BAUD 20150
@@ -292,10 +286,7 @@ int getTempdata(byte sensorAddress[8]) {
 
 void setup()
 {
-  pinMode(NTX2_SPACE_PIN, OUTPUT); //Radio Tx0
-  pinMode(NTX2_MARK_PIN, OUTPUT); //Radio Tx1
-  pinMode(NTX2_POWER_PIN, OUTPUT); //Radio En
-  digitalWrite(NTX2_POWER_PIN, HIGH);
+  pinMode(NTX2_RADIO_PIN, OUTPUT); //Radio Tx0
   Serial.begin(9600);
   
   delay(5000); // We have to wait for a bit for the GPS to boot otherwise the commands get missed
