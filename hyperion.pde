@@ -25,8 +25,8 @@ OneWire ds(ONE_WIRE_BUS); // DS18x20 Temperature chip i/o One-wire
 //Tempsensor variables
 byte address0[8] = {0x10, 0x68, 0x10, 0x36, 0x02, 0x08, 0x00, 0x9D};
 byte address1[8] = {0x10, 0xA3, 0x32, 0x36, 0x02, 0x08, 0x00, 0x81};
+byte address2[8] = {0x28, 0xE8, 0x89, 0xC2, 0x02, 0x00, 0x00, 0xDF}; // placeholder
 
-byte address2[8] = {0x28, 0xE8, 0x89, 0xC2, 0x2, 0x0, 0x0, 0xDF}; // placeholder
 int temp0 = 0, temp1 = 0, temp2 = 0;
 
 int count = 1, nightloop = 0;
@@ -38,6 +38,15 @@ int hour = 0 , minute = 0 , second = 0, oldsecond = 0;
 char latbuf[12] = "0", lonbuf[12] = "0", altbuf[12] = "0";
 long int ialt = 123;
 int numbersats = 99;
+
+// Voltage divider stuff
+const byte voltPin = 4 ;
+const float vccVoltage = 5;
+const float denominator = 0.5;
+float analogVoltage;
+float voltage;
+char voltbuf[6] = "0";
+
 
 // ------------------------
 // RTTY Functions - from RJHARRISON's AVR Code
@@ -345,10 +354,15 @@ void loop() {
     
     temp0 = getTempdata(address0);
     temp1 = getTempdata(address1);
+    temp2 = getTempdata(address2);
 
     numbersats = gps.sats();
     
-    n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, temp0, temp1 );
+    analogVoltage = analogRead(voltPin);
+    voltage = ((analogVoltage / 1024) * vccVoltage) * 2;
+    dtostrf(voltage,4,2,voltbuf); // convert to string
+
+    n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d,%d,%s", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, temp0, temp1, temp2, voltbuf );
     if (n > -1){
       n = sprintf (superbuffer, "%s*%04X\n", superbuffer, gps_CRC16_checksum(superbuffer));
       rtty_txstring(superbuffer);
