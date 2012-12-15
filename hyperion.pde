@@ -18,6 +18,7 @@ Minor modifications by Costyn van Dongen
 
 #define ONE_WIRE_BUS 10
 #define NTX2_RADIO_PIN 13
+#define VOLT_DIV_PIN 4
 
 TinyGPS gps;
 OneWire ds(ONE_WIRE_BUS); // DS18x20 Temperature chip i/o One-wire
@@ -25,11 +26,11 @@ OneWire ds(ONE_WIRE_BUS); // DS18x20 Temperature chip i/o One-wire
 //Tempsensor variables
 byte address0[8] = {0x10, 0x68, 0x10, 0x36, 0x02, 0x08, 0x00, 0x9D};
 byte address1[8] = {0x10, 0xA3, 0x32, 0x36, 0x02, 0x08, 0x00, 0x81};
-byte address2[8] = {0x28, 0xE8, 0x89, 0xC2, 0x02, 0x00, 0x00, 0xDF}; // placeholder
+byte address2[8] = {0x28, 0x49, 0x96, 0x2A, 0x04, 0x00, 0x00, 0x23}; // internal temp
 
 int temp0 = 0, temp1 = 0, temp2 = 0;
 
-int count = 1, nightloop = 0;
+int count = 1;
 byte navmode = 99;
 float flat, flon;
 unsigned long date, time, chars, age;
@@ -40,9 +41,8 @@ long int ialt = 123;
 int numbersats = 99;
 
 // Voltage divider stuff
-const byte voltPin = 4 ;
-const float vccVoltage = 5;
-const float denominator = 0.5;
+const int voltPin = VOLT_DIV_PIN;
+const float vccVoltage = 5.0;
 float analogVoltage;
 float voltage;
 char voltbuf[6] = "0";
@@ -314,11 +314,11 @@ void loop() {
        setupGPS();
        delay(1000);
      }
-      Serial.println("$PUBX,00*33"); //Poll GPS to clear garbage
-     Serial.println("$PUBX,00*33"); //Poll GPS to clear garbage
+     Serial.println("$PUBX,00*33"); // Poll GPS to clear garbage
+     Serial.println("$PUBX,00*33"); // Poll GPS to clear garbage
     }
    
-    Serial.println("$PUBX,00*33"); //Poll GPS
+    Serial.println("$PUBX,00*33"); // Poll GPS
     
     while (Serial.available())
     {
@@ -359,7 +359,7 @@ void loop() {
     numbersats = gps.sats();
     
     analogVoltage = analogRead(voltPin);
-    voltage = ((analogVoltage / 1024) * vccVoltage) * 2;
+    voltage = ((analogVoltage / 1024) * vccVoltage) / 0.5 ;
     dtostrf(voltage,4,2,voltbuf); // convert to string
 
     n=sprintf (superbuffer, "$$HYPERION,%d,%02d:%02d:%02d,%s,%s,%ld,%d,%d,%d,%d,%d,%s", count, hour, minute, second, latbuf, lonbuf, ialt, numbersats, navmode, temp0, temp1, temp2, voltbuf );
